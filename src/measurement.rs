@@ -164,8 +164,8 @@ fn get_movement_counter(data: &str) -> u8 {
 }
 
 fn get_measurement_sequence_number(data: &str) -> u16 {
-    let measurement_sequence_number_1 = u16::from_str_radix(&data[36..40], 16).unwrap();
-    let measurement_sequence_number_2 = u16::from_str_radix(&data[36..40], 16).unwrap();
+    let measurement_sequence_number_1 = u16::from_str_radix(&data[36..38], 16).unwrap();
+    let measurement_sequence_number_2 = u16::from_str_radix(&data[38..40], 16).unwrap();
     (measurement_sequence_number_1 & 0xFF) << 8 | measurement_sequence_number_2 & 0xFF
 }
 
