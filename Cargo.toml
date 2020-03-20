@@ -11,5 +11,5 @@ libmath = "0.2.1"
 clap = "2.33.0"
 
 [[bin]]
-name = "flf"
-path = "src/bin/flf.rs"
+name = "cli"
+path = "src/bin/cli.rs"
