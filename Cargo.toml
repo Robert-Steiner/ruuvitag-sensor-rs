@@ -1,0 +1,15 @@
+[package]
+name = "ruuvitag-sensor-rs"
+version = "0.1.0"
+authors = ["Robert Steiner <robertt.debug@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+btleplug = "0.4.1"
+hex = "0.4.2"
+libmath = "0.2.1"
+clap = "2.33.0"
+
+[[bin]]
+name = "flf"
+path = "src/bin/flf.rs"
