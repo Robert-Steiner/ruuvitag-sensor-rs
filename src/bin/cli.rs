@@ -1,4 +1,10 @@
-use btleplug::api::{Central, Peripheral};
+use btleplug::api::{
+    BDAddr, Central,
+    CentralEvent::{
+        DeviceConnected, DeviceDisconnected, DeviceDiscovered, DeviceLost, DeviceUpdated,
+    },
+    Peripheral,
+};
 use btleplug::bluez::{adapter::ConnectedAdapter, manager::Manager};
 use clap::{crate_version, App, Arg};
 
@@ -29,26 +35,32 @@ pub fn main() {
         )
         .get_matches();
 
-    let ruuvi_tags: Vec<&str> = matches.values_of("mac").unwrap().collect();
+    let ruuvi_tags: Vec<BDAddr> = matches
+        .values_of("mac")
+        .unwrap()
+        .map(|e| BDAddr::from_str(e).unwrap())
+        .collect();
 
     let manager = Manager::new().unwrap();
 
     let central = get_central(&manager);
+
     loop {
-        // start scanning for devices
-        central.start_scan().unwrap();
+        thread::sleep(Duration::from_secs(5));
+        for tag in ruuvi_tags.iter() {
+            let resp = central.peripheral(*tag);
+            match resp {
+                Some(prop) => {
+                    let hex_format = hex::encode(prop.properties().manufacturer_data.unwrap());
+                    let decode_measurement = RuuviMeasurement::from_str(&hex_format);
 
-        thread::sleep(Duration::from_secs(2));
-        for device in central.peripherals().into_iter() {
-            if ruuvi_tags
-                .iter()
-                .any(|x| x == &device.address().to_string())
-            {
-                let hex_format = hex::encode(device.properties().manufacturer_data.unwrap());
-                let measurement = RuuviMeasurement::from_str(&hex_format);
-
-                println!("{:?}", measurement);
-            }
+                    match decode_measurement {
+                        Ok(measurement) => println!("{:?}", measurement),
+                        Err(_) => eprintln!("Decode error!"),
+                    }
+                }
+                None => eprintln!("Tag not found {:?}!", tag),
+            };
         }
     }
 }
