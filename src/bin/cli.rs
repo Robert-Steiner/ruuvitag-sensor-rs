@@ -1,24 +1,9 @@
-use btleplug::api::{
-    BDAddr, Central,
-    CentralEvent::{
-        DeviceConnected, DeviceDisconnected, DeviceDiscovered, DeviceLost, DeviceUpdated,
-    },
-    Peripheral,
-};
-use btleplug::bluez::{adapter::ConnectedAdapter, manager::Manager};
-use clap::{crate_version, App, Arg};
+use btleplug::api::BDAddr;
+use clap::{crate_version, value_t, App, Arg};
 
-use ruuvitag_sensor_rs::measurement::RuuviMeasurement;
+use ruuvitag_sensor_rs::ble::{collect, find_ruuvi_tags, get_central, scan};
 
 use std::str::FromStr;
-use std::thread;
-use std::time::Duration;
-
-fn get_central(manager: &Manager) -> ConnectedAdapter {
-    let adapters = manager.adapters().unwrap();
-    let adapter = adapters.into_iter().nth(0).unwrap();
-    adapter.connect().unwrap()
-}
 
 pub fn main() {
     let matches = App::new("Ruuvitag sensor gateway")
@@ -29,38 +14,34 @@ pub fn main() {
                 .short("m")
                 .long("mac")
                 .multiple(true)
-                .required(true)
                 .value_name("MAC")
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name("timeout")
+                .help("timeout in seconds")
+                .short("t")
+                .long("timeout")
+                .value_name("TIMEOUT in SEC")
+                .takes_value(true),
+        )
+        .subcommand(App::new("scan"))
+        .subcommand(App::new("find"))
         .get_matches();
 
-    let ruuvi_tags: Vec<BDAddr> = matches
-        .values_of("mac")
-        .unwrap()
-        .map(|e| BDAddr::from_str(e).unwrap())
-        .collect();
+    let central = get_central();
 
-    let manager = Manager::new().unwrap();
-
-    let central = get_central(&manager);
-
-    loop {
-        thread::sleep(Duration::from_secs(5));
-        for tag in ruuvi_tags.iter() {
-            let resp = central.peripheral(*tag);
-            match resp {
-                Some(prop) => {
-                    let hex_format = hex::encode(prop.properties().manufacturer_data.unwrap());
-                    let decode_measurement = RuuviMeasurement::from_str(&hex_format);
-
-                    match decode_measurement {
-                        Ok(measurement) => println!("{:?}", measurement),
-                        Err(_) => eprintln!("Decode error!"),
-                    }
-                }
-                None => eprintln!("Tag not found {:?}!", tag),
-            };
-        }
+    if let Some(_is_present) = matches.subcommand_matches("scan") {
+        scan(&central);
+    } else if let Some(_is_present) = matches.subcommand_matches("find") {
+        find_ruuvi_tags(&central);
+    } else {
+        let ruuvi_tags: Vec<BDAddr> = matches
+            .values_of("mac")
+            .unwrap()
+            .map(|e| BDAddr::from_str(e).unwrap())
+            .collect();
+        let timeout = value_t!(matches.value_of("timeout"), u64).unwrap_or(5);
+        collect(&central, &ruuvi_tags, timeout);
     }
 }

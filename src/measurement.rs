@@ -180,3 +180,8 @@ fn get_mac(data: &str) -> String {
     }
     mac
 }
+
+pub fn is_ruuvi_tag(hex_string: &str) -> bool {
+    let manufacturer_id = u16::from_str_radix(&hex_string[..4], 16).unwrap();
+    manufacturer_id == 0x9904
+}
