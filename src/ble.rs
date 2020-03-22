@@ -1,5 +1,6 @@
 use btleplug::api::{BDAddr, Central, CentralEvent::DeviceDiscovered, Peripheral};
 use btleplug::bluez::{adapter::ConnectedAdapter, manager::Manager};
+use tokio::sync::mpsc::UnboundedSender;
 
 use crate::measurement::{is_ruuvi_tag, RuuviMeasurement};
 
@@ -22,16 +23,24 @@ pub fn scan(central: &ConnectedAdapter) {
     }
 }
 
-pub fn collect(central: &ConnectedAdapter, ruuvi_tags: &Vec<BDAddr>, timeout: u64) {
+pub fn collect(
+    central: &ConnectedAdapter,
+    sender: UnboundedSender<RuuviMeasurement>,
+    ruuvi_tags: &Vec<BDAddr>,
+    scanning_rate: u64,
+) {
     loop {
-        thread::sleep(Duration::from_secs(timeout));
+        thread::sleep(Duration::from_secs(scanning_rate));
         for tag in ruuvi_tags.iter() {
             if let Some(peripheral) = central.peripheral(*tag) {
                 if let Some(manufacturer_data) = peripheral.properties().manufacturer_data {
                     let hex_format = hex::encode(manufacturer_data);
                     let decode_measurement = RuuviMeasurement::from_str(&hex_format);
                     match decode_measurement {
-                        Ok(measurement) => println!("{:#?}", measurement),
+                        Ok(measurement) => {
+                            sender.send(measurement);
+                        }
+
                         Err(_) => eprintln!("Decode error!"),
                     }
                 }
