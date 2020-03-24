@@ -1,52 +1,63 @@
-use crate::measurement::RuuviMeasurement;
+use crate::ruuvitag::RuuviTag;
 use chrono::{DateTime, Utc};
-use influxdb::InfluxDbWriteable;
-use influxdb::{Client, Timestamp};
+use influxdb::{Client, InfluxDbWriteable, Timestamp};
+use ruuvi_sensor_protocol::{
+    Acceleration, AccelerationVector, BatteryPotential, Humidity, MeasurementSequenceNumber,
+    MovementCounter, Pressure, Temperature,
+};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
-#[derive(InfluxDbWriteable)]
-struct RuuviMeasurementInflux {
+#[derive(InfluxDbWriteable, Debug)]
+struct RuuviTagMeasurement {
     time: DateTime<Utc>,
     temperature: f64,
     humidity: f64,
-    acceleration_x: i32,
-    acceleration_y: i32,
-    acceleration_z: i32,
-    battery_voltage: f64,
-    tx_power: u8,
-    movement_counter: u8,
-    sequence_number: u16,
-    pressure: u16,
+    pressure: u32,
+    accelerationX: i16,
+    accelerationY: i16,
+    accelerationZ: i16,
+    batteryVoltage: f64,
+    movementCounter: u32,
+    measurementSequenceNumber: u32,
     #[tag]
     mac: String,
 }
 
-pub struct InfluxDBStore {
-    client: Client,
-    receiver: UnboundedReceiver<RuuviMeasurement>,
+impl From<RuuviTag> for RuuviTagMeasurement {
+    fn from(tag: RuuviTag) -> Self {
+        let AccelerationVector(acc_x, acc_y, acc_z) =
+            tag.sensor_values.acceleration_vector_as_milli_g().unwrap();
+        RuuviTagMeasurement {
+            time: Timestamp::Now.into(),
+            temperature: tag.sensor_values.temperature_as_millicelsius().unwrap() as f64 / 1000_f64,
+            humidity: tag.sensor_values.humidity_as_ppm().unwrap() as f64 / 10000_f64,
+            pressure: (tag.sensor_values.pressure_as_pascals().unwrap() as f64 / 100_f64) as u32,
+            accelerationX: acc_x,
+            accelerationY: acc_y,
+            accelerationZ: acc_z,
+            batteryVoltage: tag.sensor_values.battery_potential_as_millivolts().unwrap() as f64
+                / 1000_f64,
+            movementCounter: tag.sensor_values.movement_counter().unwrap(),
+            measurementSequenceNumber: tag.sensor_values.measurement_sequence_number().unwrap(),
+            mac: tag.mac,
+        }
+    }
 }
 
-pub async fn run_influx_db(mut influx_client: InfluxDBStore) {
+pub struct InfluxDBConnector {
+    client: Client,
+    receiver: UnboundedReceiver<RuuviTag>,
+}
+
+pub async fn run_influx_db(mut influxdb_connector: InfluxDBConnector) {
     loop {
-        match influx_client.receiver.recv().await {
+        match influxdb_connector.receiver.recv().await {
             Some(measurement) => {
-                let convert = RuuviMeasurementInflux {
-                    time: Timestamp::Now.into(),
-                    temperature: measurement.temperature,
-                    humidity: measurement.humidity,
-                    pressure: measurement.pressure,
-                    acceleration_x: measurement.acceleration_x,
-                    acceleration_y: measurement.acceleration_y,
-                    acceleration_z: measurement.acceleration_z,
-                    battery_voltage: measurement.battery_voltage,
-                    tx_power: measurement.tx_power,
-                    movement_counter: measurement.movement_counter,
-                    sequence_number: measurement.sequence_number,
-                    mac: measurement.mac,
-                };
-                let _ = influx_client
+                let _ = influxdb_connector
                     .client
-                    .query(&convert.into_query("ruuvi_measurements_rs"))
+                    .query(
+                        &RuuviTagMeasurement::from(measurement).into_query("ruuvi_measurements_rs"),
+                    )
                     .await
                     .map_err(|e| eprintln!("{}", e));
             }
@@ -58,11 +69,11 @@ pub async fn run_influx_db(mut influx_client: InfluxDBStore) {
     }
 }
 
-impl InfluxDBStore {
-    pub fn new(host: &str, db_name: &str) -> (InfluxDBStore, UnboundedSender<RuuviMeasurement>) {
+impl InfluxDBConnector {
+    pub fn new(host: &str, db_name: &str) -> (InfluxDBConnector, UnboundedSender<RuuviTag>) {
         let (sender, receiver) = unbounded_channel();
         (
-            InfluxDBStore {
+            InfluxDBConnector {
                 client: Client::new(host, db_name),
                 receiver,
             },

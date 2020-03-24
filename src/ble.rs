@@ -2,9 +2,8 @@ use btleplug::api::{BDAddr, Central, CentralEvent::DeviceDiscovered, Peripheral}
 use btleplug::bluez::{adapter::ConnectedAdapter, manager::Manager};
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::measurement::{is_ruuvi_tag, RuuviMeasurement};
+use crate::ruuvitag::{from_manufacturer_data, is_ruuvitag, RuuviTag};
 
-use std::str::FromStr;
 use std::thread;
 use std::time::Duration;
 
@@ -25,7 +24,7 @@ pub fn scan(central: &ConnectedAdapter) {
 
 pub fn collect(
     central: &ConnectedAdapter,
-    sender: UnboundedSender<RuuviMeasurement>,
+    sender: UnboundedSender<RuuviTag>,
     ruuvi_tags: &Vec<BDAddr>,
     scanning_rate: u64,
 ) {
@@ -34,14 +33,15 @@ pub fn collect(
         for tag in ruuvi_tags.iter() {
             if let Some(peripheral) = central.peripheral(*tag) {
                 if let Some(manufacturer_data) = peripheral.properties().manufacturer_data {
-                    let hex_format = hex::encode(manufacturer_data);
-                    let decode_measurement = RuuviMeasurement::from_str(&hex_format);
-                    match decode_measurement {
-                        Ok(measurement) => {
-                            sender.send(measurement);
+                    let sensor_values = from_manufacturer_data(&manufacturer_data);
+                    match sensor_values {
+                        Ok(data) => {
+                            let _ = sender.send(RuuviTag {
+                                mac: peripheral.properties().address.to_string(),
+                                sensor_values: data,
+                            });
                         }
-
-                        Err(_) => eprintln!("Decode error!"),
+                        Err(_) => eprintln!("Parse error!"),
                     }
                 }
             } else {
@@ -51,15 +51,14 @@ pub fn collect(
     }
 }
 
-pub fn find_ruuvi_tags(central: &ConnectedAdapter) {
+pub fn find_ruuvitags(central: &ConnectedAdapter) {
     let central_clone = central.clone();
     central.on_event(Box::new(move |event| match event {
         DeviceDiscovered(bd_addr) => {
             if let Some(peripheral) = central_clone.peripheral(bd_addr) {
                 if let Some(manufacturer_data) = peripheral.properties().manufacturer_data {
-                    let hex_format = hex::encode(manufacturer_data);
-                    if is_ruuvi_tag(&hex_format) {
-                        println!("New Ruuvi tag: {}", peripheral.properties().address)
+                    if is_ruuvitag(&manufacturer_data) {
+                        println!("New RuuviTag: {}", peripheral.properties().address)
                     }
                 }
             }

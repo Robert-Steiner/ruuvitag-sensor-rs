@@ -1,7 +1,7 @@
 use btleplug::api::BDAddr;
 use clap::{crate_version, value_t, App, Arg};
-use ruuvitag_sensor_rs::ble::{collect, find_ruuvi_tags, get_central, scan};
-use ruuvitag_sensor_rs::influx::{run_influx_db, InfluxDBStore};
+use ruuvitag_sensor_rs::ble::{collect, find_ruuvitags, get_central, scan};
+use ruuvitag_sensor_rs::influx::{run_influx_db, InfluxDBConnector};
 use std::thread;
 use tokio::runtime;
 
@@ -57,7 +57,7 @@ pub fn main() {
     if let Some(_is_present) = matches.subcommand_matches("scan") {
         scan(&central);
     } else if let Some(_is_present) = matches.subcommand_matches("find") {
-        find_ruuvi_tags(&central);
+        find_ruuvitags(&central);
     } else if let Some(collect_match) = matches.subcommand_matches("collect") {
         let ruuvi_tags: Vec<BDAddr> = collect_match
             .values_of("mac")
@@ -69,7 +69,7 @@ pub fn main() {
         let influxdb_url = collect_match.value_of("influxdb_url").unwrap();
         let influxdb_db_name = collect_match.value_of("influxdb_db_name").unwrap();
 
-        let (influx_client, sender) = InfluxDBStore::new(influxdb_url, influxdb_db_name);
+        let (influx_client, sender) = InfluxDBConnector::new(influxdb_url, influxdb_db_name);
 
         thread::spawn(|| {
             let mut rt = runtime::Builder::new()
