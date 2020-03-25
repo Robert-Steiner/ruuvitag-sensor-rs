@@ -14,22 +14,14 @@ pub fn get_central() -> ConnectedAdapter {
     adapter.connect().unwrap()
 }
 
-pub fn scan(central: &ConnectedAdapter) {
-    central.start_scan().unwrap();
-    thread::sleep(Duration::from_secs(2));
-    for device in central.peripherals().into_iter() {
-        println!("{}", device);
-    }
-}
-
 pub fn collect(
     central: &ConnectedAdapter,
     sender: UnboundedSender<RuuviTag>,
     ruuvi_tags: &Vec<BDAddr>,
-    scanning_rate: u64,
+    scanning_rate: u16,
 ) {
     loop {
-        thread::sleep(Duration::from_secs(scanning_rate));
+        thread::sleep(Duration::from_secs(scanning_rate.into()));
         for tag in ruuvi_tags.iter() {
             if let Some(peripheral) = central.peripheral(*tag) {
                 if let Some(manufacturer_data) = peripheral.properties().manufacturer_data {
