@@ -7,6 +7,7 @@ use ruuvi_sensor_protocol::{
 };
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
+#[allow(non_snake_case)]
 #[derive(InfluxDbWriteable, Debug)]
 struct RuuviTagMeasurement {
     time: DateTime<Utc>,
@@ -49,15 +50,13 @@ pub struct InfluxDBConnector {
     receiver: UnboundedReceiver<RuuviTag>,
 }
 
-pub async fn run_influx_db(mut influxdb_connector: InfluxDBConnector) {
+pub async fn run_influx_db(mut influxdb_connector: InfluxDBConnector, measurement_name: &str) {
     loop {
         match influxdb_connector.receiver.recv().await {
             Some(measurement) => {
                 let _ = influxdb_connector
                     .client
-                    .query(
-                        &RuuviTagMeasurement::from(measurement).into_query("ruuvi_measurements_rs"),
-                    )
+                    .query(&RuuviTagMeasurement::from(measurement).into_query(measurement_name))
                     .await
                     .map_err(|e| eprintln!("{}", e));
             }

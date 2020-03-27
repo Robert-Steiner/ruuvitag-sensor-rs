@@ -40,9 +40,16 @@ enum Args {
             help = "Name of the InfluxDB database."
         )]
         influxdb_db_name: String,
+        #[structopt(
+            long = "influxdb_measurement_name",
+            default_value = "ruuvi",
+            help = "Name of the measurement."
+        )]
+        influxdb_measurement_name: String,
     },
     Find {},
 }
+
 #[paw::main]
 fn main(args: Args) -> Result<(), std::io::Error> {
     let central = get_central();
@@ -53,6 +60,7 @@ fn main(args: Args) -> Result<(), std::io::Error> {
             scanning_rate,
             influxdb_url,
             influxdb_db_name,
+            influxdb_measurement_name,
         } => {
             let (influx_client, sender) = InfluxDBConnector::new(&influxdb_url, &influxdb_db_name);
 
@@ -62,7 +70,9 @@ fn main(args: Args) -> Result<(), std::io::Error> {
                     .enable_all()
                     .build()
                     .unwrap();
-                let _ = rt.block_on(async move { run_influx_db(influx_client).await });
+                let _ = rt.block_on(async move {
+                    run_influx_db(influx_client, &influxdb_measurement_name).await
+                });
             });
 
             collect(&central, sender, &ruuvitags_macs, scanning_rate);
