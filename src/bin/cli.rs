@@ -1,10 +1,14 @@
-use btleplug::api::BDAddr;
+use btleplug::api::{BDAddr, ParseBDAddrError};
 use ruuvitag_sensor_rs::ble::{collect, find_ruuvitags, get_central};
 use ruuvitag_sensor_rs::influx::{run_influx_db, InfluxDBConnector};
 use std::thread;
 use tokio::runtime;
 
 use std::str::FromStr;
+
+fn parse_address(address: &str) -> Result<BDAddr, ParseBDAddrError> {
+    BDAddr::from_str(&address)
+}
 
 #[derive(structopt::StructOpt, Debug)]
 enum Args {
@@ -13,9 +17,10 @@ enum Args {
             short = "m",
             long = "mac",
             required = true,
-            help = "MAC address of the RuuviTag."
+            help = "MAC address of the RuuviTag.",
+            parse(try_from_str = parse_address)
         )]
-        macs: Vec<String>,
+        ruuvitags_macs: Vec<BDAddr>,
         #[structopt(
             short = "s",
             long = "rate",
@@ -44,13 +49,11 @@ fn main(args: Args) -> Result<(), std::io::Error> {
 
     match args {
         Args::Collect {
-            macs,
+            ruuvitags_macs,
             scanning_rate,
             influxdb_url,
             influxdb_db_name,
         } => {
-            let ruuvi_tags: Vec<BDAddr> =
-                macs.iter().map(|e| BDAddr::from_str(&e).unwrap()).collect();
             let (influx_client, sender) = InfluxDBConnector::new(&influxdb_url, &influxdb_db_name);
 
             thread::spawn(|| {
@@ -62,7 +65,7 @@ fn main(args: Args) -> Result<(), std::io::Error> {
                 let _ = rt.block_on(async move { run_influx_db(influx_client).await });
             });
 
-            collect(&central, sender, &ruuvi_tags, scanning_rate);
+            collect(&central, sender, &ruuvitags_macs, scanning_rate);
         }
         Args::Find {} => {
             find_ruuvitags(&central);
