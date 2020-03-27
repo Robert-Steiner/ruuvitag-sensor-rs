@@ -17,13 +17,13 @@ pub fn get_central() -> ConnectedAdapter {
 pub fn collect(
     central: &ConnectedAdapter,
     sender: UnboundedSender<RuuviTag>,
-    ruuvi_tags: &Vec<BDAddr>,
+    ruuvitags_macs: &Vec<BDAddr>,
     scanning_rate: u16,
 ) {
     loop {
         thread::sleep(Duration::from_secs(scanning_rate.into()));
-        for tag in ruuvi_tags.iter() {
-            if let Some(peripheral) = central.peripheral(*tag) {
+        for mac in ruuvitags_macs.iter() {
+            if let Some(peripheral) = central.peripheral(*mac) {
                 if let Some(manufacturer_data) = peripheral.properties().manufacturer_data {
                     let sensor_values = from_manufacturer_data(&manufacturer_data);
                     match sensor_values {
@@ -37,7 +37,7 @@ pub fn collect(
                     }
                 }
             } else {
-                eprintln!("Tag not found {:?}!", tag)
+                eprintln!("RuuviTag not found {}!", mac)
             }
         }
     }
@@ -50,7 +50,7 @@ pub fn find_ruuvitags(central: &ConnectedAdapter) {
             if let Some(peripheral) = central_clone.peripheral(bd_addr) {
                 if let Some(manufacturer_data) = peripheral.properties().manufacturer_data {
                     if is_ruuvitag(&manufacturer_data) {
-                        println!("New RuuviTag: {}", peripheral.properties().address)
+                        println!("Found RuuviTag: {}", peripheral.properties().address)
                     }
                 }
             }
