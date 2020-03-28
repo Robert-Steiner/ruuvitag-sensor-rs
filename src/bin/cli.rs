@@ -1,3 +1,4 @@
+use btleplug::api::Central;
 use btleplug::api::{BDAddr, ParseBDAddrError};
 use ruuvitag_sensor_rs::ble::{collect, find_ruuvitags, get_central};
 use ruuvitag_sensor_rs::influx::{run_influx_db, InfluxDBConnector};
@@ -53,6 +54,8 @@ enum Args {
 #[paw::main]
 fn main(args: Args) -> Result<(), std::io::Error> {
     let central = get_central();
+    central.active(false);
+    central.start_scan().unwrap();
 
     match args {
         Args::Collect {
