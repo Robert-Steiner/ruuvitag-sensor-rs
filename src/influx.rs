@@ -40,7 +40,7 @@ impl From<RuuviTag> for RuuviTagMeasurement {
                 / 1000_f64,
             movementCounter: tag.sensor_values.movement_counter().unwrap(),
             measurementSequenceNumber: tag.sensor_values.measurement_sequence_number().unwrap(),
-            mac: tag.mac,
+            mac: tag.mac.to_string(),
         }
     }
 }

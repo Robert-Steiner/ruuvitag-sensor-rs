@@ -12,6 +12,7 @@ tokio = { version = "0.2.13", features = ["rt-core", "rt-threaded", "sync", "str
 ruuvi-sensor-protocol = "0.4.1"
 structopt = { version = "0.3", features = [ "paw" ] }
 paw = "1.0"
+colored = "1.9"
 
 [[bin]]
 name = "cli"

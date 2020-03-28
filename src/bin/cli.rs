@@ -1,10 +1,6 @@
-use btleplug::api::Central;
-use btleplug::api::{BDAddr, ParseBDAddrError};
-use ruuvitag_sensor_rs::ble::{collect, find_ruuvitags, get_central};
-use ruuvitag_sensor_rs::influx::{run_influx_db, InfluxDBConnector};
-use std::thread;
-use tokio::runtime;
-
+use btleplug::api::{BDAddr, Central, ParseBDAddrError};
+use ruuvitag_sensor_rs::ble::{get_central, register_event_handler};
+use ruuvitag_sensor_rs::controller::Controller;
 use std::str::FromStr;
 
 fn parse_address(address: &str) -> Result<BDAddr, ParseBDAddrError> {
@@ -23,13 +19,6 @@ enum Args {
         )]
         ruuvitags_macs: Vec<BDAddr>,
         #[structopt(
-            short = "s",
-            long = "rate",
-            default_value = "5",
-            help = "Scanning rate in seconds."
-        )]
-        scanning_rate: u16,
-        #[structopt(
             long = "influxdb_url",
             default_value = "http://localhost:8086",
             help = "URL of the InfluxDB instance."
@@ -43,45 +32,45 @@ enum Args {
         influxdb_db_name: String,
         #[structopt(
             long = "influxdb_measurement_name",
-            default_value = "ruuvi",
+            default_value = "ruuvi_measurements",
             help = "Name of the measurement."
         )]
         influxdb_measurement_name: String,
     },
     Find {},
+    Show {},
 }
 
 #[paw::main]
 fn main(args: Args) -> Result<(), std::io::Error> {
+    let (controller, event_tx) = Controller::new();
+
     let central = get_central();
     central.active(false);
-    central.start_scan().unwrap();
+    register_event_handler(event_tx, &central);
 
     match args {
         Args::Collect {
             ruuvitags_macs,
-            scanning_rate,
             influxdb_url,
             influxdb_db_name,
             influxdb_measurement_name,
         } => {
-            let (influx_client, sender) = InfluxDBConnector::new(&influxdb_url, &influxdb_db_name);
-
-            thread::spawn(|| {
-                let mut rt = runtime::Builder::new()
-                    .threaded_scheduler()
-                    .enable_all()
-                    .build()
-                    .unwrap();
-                let _ = rt.block_on(async move {
-                    run_influx_db(influx_client, &influxdb_measurement_name).await
-                });
-            });
-
-            collect(&central, sender, &ruuvitags_macs, scanning_rate);
+            central.start_scan().unwrap();
+            controller.collect(
+                &ruuvitags_macs,
+                &influxdb_url,
+                &influxdb_db_name,
+                &influxdb_measurement_name,
+            );
         }
         Args::Find {} => {
-            find_ruuvitags(&central);
+            central.start_scan().unwrap();
+            controller.find();
+        }
+        Args::Show {} => {
+            central.start_scan().unwrap();
+            controller.show();
         }
     }
     Ok(())
