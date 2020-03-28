@@ -17,7 +17,8 @@ This CLI was successfully tested on a Raspberry PI 3B+.
 ```
 git clone https://github.com/Robert-Steiner/ruuvitag-sensor-rs.git
 cd ruuvitag-sensor-rs
-cargo build --release
+cargo install --path .
+sudo setcap 'cap_net_raw,cap_net_admin+eip' `which ruuvi-cli`
 ```
 
 ## Usage
@@ -26,13 +27,13 @@ cargo build --release
 
 Command:
 
-`sudo ./target/debug/cli find`
+`ruuvi-cli find`
 
 Output:
 
 ```
-New RuuviTag: FD:AA:AA:AA:AA:AA
-New RuuviTag: EC:BB:BB:BB:BB:BB
+Found RuuviTag: FD:AA:AA:AA:AA:AA
+Found RuuviTag: EC:BB:BB:BB:BB:BB
 ...
 ```
 
@@ -40,8 +41,8 @@ New RuuviTag: EC:BB:BB:BB:BB:BB
 
 Command:
 
-`sudo ./target/debug/cli collect -m FD:AA:AA:AA:AA:AA -m EC:BB:BB:BB:BB:BB`
+`ruuvi-cli collect -m FD:AA:AA:AA:AA:AA -m EC:BB:BB:BB:BB:BB`
 
 To see all `collect` options run:
 
-`sudo ./target/debug/cli collect -h`
+`ruuvi-cli collect -h`

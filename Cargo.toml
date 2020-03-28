@@ -15,5 +15,5 @@ paw = "1.0"
 colored = "1.9"
 
 [[bin]]
-name = "cli"
+name = "ruuvi-cli"
 path = "src/bin/cli.rs"
