@@ -1,4 +1,4 @@
-use crate::ruuvitag::{from_manufacturer_data, is_ruuvitag, RuuviTag};
+use crate::ruuvitag::{is_ruuvitag, RuuviTag};
 use btleplug::api::{
     Central,
     CentralEvent::{DeviceDiscovered, DeviceUpdated},
@@ -25,44 +25,39 @@ pub enum Event {
 }
 
 pub fn register_event_handler(event_sender: Sender<Event>, central: &ConnectedAdapter) {
-    let central_clone = central.clone();
-    central.on_event(Box::new(move |event| match event {
+    let central_event_handler = central.clone();
+
+    let on_event_handler = Box::new(move |event| match event {
         DeviceDiscovered(bd_addr) => {
-            if let Some(peripheral) = central_clone.peripheral(bd_addr) {
+            if let Some(peripheral) = central_event_handler.peripheral(bd_addr) {
                 if let Some(manufacturer_data) = peripheral.properties().manufacturer_data {
                     if is_ruuvitag(&manufacturer_data) {
-                        let sensor_values = from_manufacturer_data(&manufacturer_data);
-                        match sensor_values {
-                            Ok(data) => {
-                                let _ = event_sender.send(Event::DeviceDiscovered(RuuviTag {
-                                    mac: peripheral.properties().address,
-                                    sensor_values: data,
-                                }));
+                        match RuuviTag::new(peripheral.properties().address, &manufacturer_data) {
+                            Ok(new_tag) => {
+                                let _ = event_sender.send(Event::DeviceDiscovered(new_tag));
                             }
-                            Err(_) => eprintln!("Error DeviceDiscovered"),
+                            Err(e) => eprintln!("Error DeviceDiscovered {}", e),
                         }
                     }
                 }
             }
         }
         DeviceUpdated(bd_addr) => {
-            if let Some(peripheral) = central_clone.peripheral(bd_addr) {
+            if let Some(peripheral) = central_event_handler.peripheral(bd_addr) {
                 if let Some(manufacturer_data) = peripheral.properties().manufacturer_data {
                     if is_ruuvitag(&manufacturer_data) {
-                        let sensor_values = from_manufacturer_data(&manufacturer_data);
-                        match sensor_values {
-                            Ok(data) => {
-                                let _ = event_sender.send(Event::DeviceUpdated(RuuviTag {
-                                    mac: peripheral.properties().address,
-                                    sensor_values: data,
-                                }));
+                        match RuuviTag::new(peripheral.properties().address, &manufacturer_data) {
+                            Ok(updated_tag) => {
+                                let _ = event_sender.send(Event::DeviceUpdated(updated_tag));
                             }
-                            Err(_) => eprintln!("Error DeviceUpdated"),
+                            Err(e) => eprintln!("Error DeviceUpdated {}", e),
                         }
                     }
                 }
             }
         }
         _ => (),
-    }));
+    });
+
+    central.on_event(on_event_handler);
 }
