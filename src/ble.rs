@@ -10,7 +10,7 @@ use std::sync::mpsc::Sender;
 pub fn get_central() -> ConnectedAdapter {
     let manager = Manager::new().unwrap();
     let adapters = manager.adapters().unwrap();
-    let mut adapter = adapters.into_iter().nth(0).unwrap();
+    let mut adapter = adapters.into_iter().next().unwrap();
 
     // reset the adapter -- clears out any errant state
     adapter = manager.down(&adapter).unwrap();

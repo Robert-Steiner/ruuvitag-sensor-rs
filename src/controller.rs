@@ -19,7 +19,7 @@ impl Controller {
 
     pub fn collect(
         self,
-        ruuvitags_macs: &Vec<BDAddr>,
+        ruuvitags_macs: &[BDAddr],
         influxdb_url: &str,
         influxdb_db_name: &str,
         influxdb_measurement_name: &str,
@@ -32,19 +32,15 @@ impl Controller {
                 .enable_all()
                 .build()
                 .unwrap();
-            let _ = rt
-                .block_on(async move { run_influx_db(influx_client, &measurement_name[..]).await });
+            rt.block_on(async move { run_influx_db(influx_client, &measurement_name[..]).await });
         });
 
         loop {
             let event = self.receiver.recv().unwrap();
-            match event {
-                DeviceUpdated(tag) => {
-                    if ruuvitags_macs.contains(&tag.mac) {
-                        let _ = sender.send(tag);
-                    }
+            if let DeviceUpdated(tag) = event {
+                if ruuvitags_macs.contains(&tag.mac) {
+                    let _ = sender.send(tag);
                 }
-                _ => (),
             }
         }
     }
@@ -52,10 +48,9 @@ impl Controller {
     pub fn find(self) {
         loop {
             let event = self.receiver.recv().unwrap();
-            match event {
-                DeviceDiscovered(tag) => println!("Found RuuviTag: {}", tag.mac),
-                _ => (),
-            };
+            if let DeviceDiscovered(tag) = event {
+                println!("Found RuuviTag: {}", tag.mac);
+            }
         }
     }
 
