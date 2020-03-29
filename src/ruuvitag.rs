@@ -40,20 +40,29 @@ pub struct SensorValuesNormalized {
 
 impl From<&SensorValues> for SensorValuesNormalized {
     fn from(sensor_values: &SensorValues) -> Self {
-        let AccelerationVector(acc_x, acc_y, acc_z) =
-            sensor_values.acceleration_vector_as_milli_g().unwrap();
+        let AccelerationVector(acc_x, acc_y, acc_z) = sensor_values
+            .acceleration_vector_as_milli_g()
+            .unwrap_or(AccelerationVector(0, 0, 0));
 
         SensorValuesNormalized {
-            temperature: sensor_values.temperature_as_millicelsius().unwrap() as f64 / 1000_f64,
-            humidity: sensor_values.humidity_as_ppm().unwrap() as f64 / 10000_f64,
-            pressure: (sensor_values.pressure_as_pascals().unwrap() as f64 / 100_f64) as u32,
+            temperature: sensor_values
+                .temperature_as_millicelsius()
+                .unwrap_or_default() as f64
+                / 1000_f64,
+            humidity: sensor_values.humidity_as_ppm().unwrap_or_default() as f64 / 10000_f64,
+            pressure: (sensor_values.pressure_as_pascals().unwrap_or_default() as f64 / 100_f64)
+                as u32,
             acceleration_x: acc_x,
             acceleration_y: acc_y,
             acceleration_z: acc_z,
-            battery_voltage: sensor_values.battery_potential_as_millivolts().unwrap() as f64
+            battery_voltage: sensor_values
+                .battery_potential_as_millivolts()
+                .unwrap_or_default() as f64
                 / 1000_f64,
-            movement_counter: sensor_values.movement_counter().unwrap(),
-            measurement_sequence_number: sensor_values.measurement_sequence_number().unwrap(),
+            movement_counter: sensor_values.movement_counter().unwrap_or_default(),
+            measurement_sequence_number: sensor_values
+                .measurement_sequence_number()
+                .unwrap_or_default(),
         }
     }
 }
