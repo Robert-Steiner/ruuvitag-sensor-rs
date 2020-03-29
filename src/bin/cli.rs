@@ -1,4 +1,6 @@
 use btleplug::api::{BDAddr, Central, ParseBDAddrError};
+use exitfailure::ExitFailure;
+use failure::ResultExt;
 use ruuvitag_sensor_rs::ble::{get_central, register_event_handler};
 use ruuvitag_sensor_rs::controller::Controller;
 use std::str::FromStr;
@@ -42,12 +44,18 @@ enum Args {
 }
 
 #[paw::main]
-fn main(args: Args) -> Result<(), std::io::Error> {
+fn main(args: Args) -> Result<(), ExitFailure> {
     let (controller, event_tx) = Controller::new();
 
-    let central = get_central();
+    let central =
+        get_central().with_context(|_| "could not initialize bluetooth adapter".to_string())?;
+
     central.active(false);
     register_event_handler(event_tx, &central);
+
+    central
+        .start_scan()
+        .with_context(|_| "could not start bluetooth scan".to_string())?;
 
     match args {
         Args::Collect {
@@ -56,7 +64,6 @@ fn main(args: Args) -> Result<(), std::io::Error> {
             influxdb_db_name,
             influxdb_measurement_name,
         } => {
-            central.start_scan().unwrap();
             controller.collect(
                 &ruuvitags_macs,
                 &influxdb_url,
@@ -65,11 +72,9 @@ fn main(args: Args) -> Result<(), std::io::Error> {
             );
         }
         Args::Find {} => {
-            central.start_scan().unwrap();
             controller.find();
         }
         Args::Show {} => {
-            central.start_scan().unwrap();
             controller.show();
         }
     }

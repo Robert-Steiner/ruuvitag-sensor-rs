@@ -1,22 +1,24 @@
 use crate::ruuvitag::{is_ruuvitag, RuuviTag};
-use btleplug::api::{
-    Central,
-    CentralEvent::{DeviceDiscovered, DeviceUpdated},
-    Peripheral,
+use btleplug::{
+    api::{
+        Central,
+        CentralEvent::{DeviceDiscovered, DeviceUpdated},
+        Peripheral,
+    },
+    bluez::{adapter::ConnectedAdapter, manager::Manager},
 };
-use btleplug::bluez::{adapter::ConnectedAdapter, manager::Manager};
 use std::sync::mpsc::Sender;
 
-pub fn get_central() -> ConnectedAdapter {
-    let manager = Manager::new().unwrap();
-    let adapters = manager.adapters().unwrap();
+pub fn get_central() -> Result<ConnectedAdapter, btleplug::Error> {
+    let manager = Manager::new()?;
+    let adapters = manager.adapters()?;
     let mut adapter = adapters.into_iter().next().unwrap();
 
     // reset the adapter -- clears out any errant state
-    adapter = manager.down(&adapter).unwrap();
-    adapter = manager.up(&adapter).unwrap();
+    adapter = manager.down(&adapter)?;
+    adapter = manager.up(&adapter)?;
 
-    adapter.connect().unwrap()
+    Ok(adapter.connect()?)
 }
 
 pub enum Event {

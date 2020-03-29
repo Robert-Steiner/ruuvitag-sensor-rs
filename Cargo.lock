@@ -335,6 +335,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "exitfailure"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ff5bd832af37f366c6c194d813a11cd90ac484f124f079294f28e357ae40515"
+dependencies = [
+ "failure",
+]
+
+[[package]]
 name = "failure"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1299,6 +1308,8 @@ dependencies = [
  "btleplug",
  "chrono",
  "colored",
+ "exitfailure",
+ "failure",
  "influxdb",
  "paw",
  "ruuvi-sensor-protocol",
