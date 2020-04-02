@@ -8,7 +8,7 @@ edition = "2018"
 btleplug = "0.4.1"
 influxdb = { version = "0.1.0", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
-tokio = { version = "0.2.13", features = ["rt-core", "rt-threaded", "sync", "stream"] }
+tokio = { version = "0.2.15", features = ["rt-core", "rt-threaded", "sync", "stream"] }
 ruuvi-sensor-protocol = "0.4.1"
 structopt = { version = "0.3", features = [ "paw" ] }
 paw = "1.0"
