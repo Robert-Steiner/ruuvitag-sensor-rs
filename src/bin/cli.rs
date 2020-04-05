@@ -15,7 +15,6 @@ enum Args {
         #[structopt(
             short = "m",
             long = "mac",
-            required = true,
             help = "MAC address of the RuuviTag.",
             parse(try_from_str = parse_address)
         )]
@@ -40,7 +39,10 @@ enum Args {
         influxdb_measurement_name: String,
     },
     Find {},
-    Show {},
+    Write {
+        #[structopt(short = "n", long = "normalize", help = "Normalize sensor values.")]
+        normalize: bool,
+    },
 }
 
 #[paw::main]
@@ -74,8 +76,8 @@ fn main(args: Args) -> Result<(), ExitFailure> {
         Args::Find {} => {
             controller.find();
         }
-        Args::Show {} => {
-            controller.show();
+        Args::Write { normalize } => {
+            controller.write(normalize);
         }
     }
     Ok(())

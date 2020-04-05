@@ -1,4 +1,4 @@
-use crate::ruuvitag::{RuuviTag, SensorValuesNormalized};
+use crate::ruuvitag::{RuuviTag, SensorValuesNormalized, SensorValuesType};
 use chrono::{DateTime, Utc};
 use influxdb::{Client, InfluxDbWriteable};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -22,7 +22,10 @@ struct RuuviTagMeasurement {
 
 impl From<RuuviTag> for RuuviTagMeasurement {
     fn from(tag: RuuviTag) -> Self {
-        let values_normalized = SensorValuesNormalized::from(&tag.sensor_values);
+        let values_normalized = match tag.sensor_values {
+            SensorValuesType::Normalized(values_normalized) => values_normalized,
+            SensorValuesType::Raw(values_raw) => SensorValuesNormalized::from(&values_raw),
+        };
 
         RuuviTagMeasurement {
             time: tag.time,

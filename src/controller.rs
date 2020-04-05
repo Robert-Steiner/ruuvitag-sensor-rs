@@ -1,7 +1,10 @@
 use crate::ble::Event;
 use crate::ble::Event::{DeviceDiscovered, DeviceUpdated};
 use crate::influx::{run_influx_db, InfluxDBConnector};
+use crate::ruuvitag::RuuviTag;
+use atty::Stream;
 use btleplug::api::BDAddr;
+use serde_json;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
@@ -35,12 +38,24 @@ impl Controller {
             rt.block_on(async move { run_influx_db(influx_client, &measurement_name[..]).await });
         });
 
-        loop {
-            let event = self.receiver.recv().unwrap();
-            if let DeviceUpdated(tag) = event {
+        let func = if ruuvitags_macs.is_empty() {
+            let without_filter: Box<dyn Fn(RuuviTag) -> ()> = Box::new(|tag: RuuviTag| {
+                let _ = sender.send(tag);
+            });
+            without_filter
+        } else {
+            let with_filter: Box<dyn Fn(RuuviTag) -> ()> = Box::new(|tag: RuuviTag| {
                 if ruuvitags_macs.contains(&tag.mac) {
                     let _ = sender.send(tag);
                 }
+            });
+            with_filter
+        };
+
+        loop {
+            let event = self.receiver.recv().unwrap();
+            if let DeviceUpdated(tag) = event {
+                func(tag);
             }
         }
     }
@@ -54,12 +69,24 @@ impl Controller {
         }
     }
 
-    pub fn show(self) {
+    pub fn write(self, normalize: bool) {
         loop {
             let event = self.receiver.recv().unwrap();
             match event {
-                DeviceDiscovered(tag) | DeviceUpdated(tag) => println!("{}", tag),
-            };
+                DeviceDiscovered(tag) | DeviceUpdated(tag) => {
+                    let maybe_normalized = if normalize {
+                        tag.normalize_sensor_values()
+                    } else {
+                        tag
+                    };
+
+                    if atty::is(Stream::Stdout) {
+                        println!("{}", maybe_normalized);
+                    } else {
+                        println!("{}", serde_json::to_string(&maybe_normalized).unwrap());
+                    }
+                }
+            }
         }
     }
 }
