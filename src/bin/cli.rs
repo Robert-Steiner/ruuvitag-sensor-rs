@@ -1,9 +1,8 @@
-use btleplug::api::{BDAddr, ParseBDAddrError};
-use ruuvitag_sensor_rs::ble::{collect, find_ruuvitags, get_central};
-use ruuvitag_sensor_rs::influx::{run_influx_db, InfluxDBConnector};
-use std::thread;
-use tokio::runtime;
-
+use btleplug::api::{BDAddr, Central, ParseBDAddrError};
+use exitfailure::ExitFailure;
+use failure::ResultExt;
+use ruuvitag_sensor_rs::ble::{get_central, register_event_handler};
+use ruuvitag_sensor_rs::controller::Controller;
 use std::str::FromStr;
 
 fn parse_address(address: &str) -> Result<BDAddr, ParseBDAddrError> {
@@ -16,18 +15,10 @@ enum Args {
         #[structopt(
             short = "m",
             long = "mac",
-            required = true,
             help = "MAC address of the RuuviTag.",
             parse(try_from_str = parse_address)
         )]
         ruuvitags_macs: Vec<BDAddr>,
-        #[structopt(
-            short = "s",
-            long = "rate",
-            default_value = "5",
-            help = "Scanning rate in seconds."
-        )]
-        scanning_rate: u16,
         #[structopt(
             long = "influxdb_url",
             default_value = "http://localhost:8086",
@@ -42,43 +33,51 @@ enum Args {
         influxdb_db_name: String,
         #[structopt(
             long = "influxdb_measurement_name",
-            default_value = "ruuvi",
+            default_value = "ruuvi_measurements",
             help = "Name of the measurement."
         )]
         influxdb_measurement_name: String,
     },
     Find {},
+    Write {
+        #[structopt(short = "n", long = "normalize", help = "Normalize sensor values.")]
+        normalize: bool,
+    },
 }
 
 #[paw::main]
-fn main(args: Args) -> Result<(), std::io::Error> {
-    let central = get_central();
+fn main(args: Args) -> Result<(), ExitFailure> {
+    let (controller, event_tx) = Controller::new();
+
+    let central =
+        get_central().with_context(|_| "could not initialize bluetooth adapter".to_string())?;
+
+    central.active(false);
+    register_event_handler(event_tx, &central);
+
+    central
+        .start_scan()
+        .with_context(|_| "could not start bluetooth scan".to_string())?;
 
     match args {
         Args::Collect {
             ruuvitags_macs,
-            scanning_rate,
             influxdb_url,
             influxdb_db_name,
             influxdb_measurement_name,
         } => {
-            let (influx_client, sender) = InfluxDBConnector::new(&influxdb_url, &influxdb_db_name);
-
-            thread::spawn(|| {
-                let mut rt = runtime::Builder::new()
-                    .threaded_scheduler()
-                    .enable_all()
-                    .build()
-                    .unwrap();
-                let _ = rt.block_on(async move {
-                    run_influx_db(influx_client, &influxdb_measurement_name).await
-                });
-            });
-
-            collect(&central, sender, &ruuvitags_macs, scanning_rate);
+            controller.collect(
+                &ruuvitags_macs,
+                &influxdb_url,
+                &influxdb_db_name,
+                &influxdb_measurement_name,
+            );
         }
         Args::Find {} => {
-            find_ruuvitags(&central);
+            controller.find();
+        }
+        Args::Write { normalize } => {
+            controller.write(normalize);
         }
     }
     Ok(())

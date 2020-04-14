@@ -8,11 +8,17 @@ edition = "2018"
 btleplug = "0.4.1"
 influxdb = { version = "0.1.0", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
-tokio = { version = "0.2.13", features = ["rt-core", "rt-threaded", "sync", "stream"] }
+tokio = { version = "0.2.16", features = ["rt-core", "rt-threaded", "sync", "stream"] }
 ruuvi-sensor-protocol = "0.4.1"
 structopt = { version = "0.3", features = [ "paw" ] }
 paw = "1.0"
+colored = "1.9"
+failure = "0.1.7"
+exitfailure = "0.5.1"
+atty = "0.2.14"
+serde = "1.0.106"
+serde_json = "1.0"
 
 [[bin]]
-name = "cli"
+name = "ruuvi-cli"
 path = "src/bin/cli.rs"

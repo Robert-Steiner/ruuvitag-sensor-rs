@@ -1,10 +1,6 @@
-use crate::ruuvitag::RuuviTag;
+use crate::ruuvitag::{RuuviTag, SensorValuesNormalized, SensorValuesType};
 use chrono::{DateTime, Utc};
-use influxdb::{Client, InfluxDbWriteable, Timestamp};
-use ruuvi_sensor_protocol::{
-    Acceleration, AccelerationVector, BatteryPotential, Humidity, MeasurementSequenceNumber,
-    MovementCounter, Pressure, Temperature,
-};
+use influxdb::{Client, InfluxDbWriteable};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 #[allow(non_snake_case)]
@@ -26,21 +22,23 @@ struct RuuviTagMeasurement {
 
 impl From<RuuviTag> for RuuviTagMeasurement {
     fn from(tag: RuuviTag) -> Self {
-        let AccelerationVector(acc_x, acc_y, acc_z) =
-            tag.sensor_values.acceleration_vector_as_milli_g().unwrap();
+        let values_normalized = match tag.sensor_values {
+            SensorValuesType::Normalized(values_normalized) => values_normalized,
+            SensorValuesType::Raw(values_raw) => SensorValuesNormalized::from(&values_raw),
+        };
+
         RuuviTagMeasurement {
-            time: Timestamp::Now.into(),
-            temperature: tag.sensor_values.temperature_as_millicelsius().unwrap() as f64 / 1000_f64,
-            humidity: tag.sensor_values.humidity_as_ppm().unwrap() as f64 / 10000_f64,
-            pressure: (tag.sensor_values.pressure_as_pascals().unwrap() as f64 / 100_f64) as u32,
-            accelerationX: acc_x,
-            accelerationY: acc_y,
-            accelerationZ: acc_z,
-            batteryVoltage: tag.sensor_values.battery_potential_as_millivolts().unwrap() as f64
-                / 1000_f64,
-            movementCounter: tag.sensor_values.movement_counter().unwrap(),
-            measurementSequenceNumber: tag.sensor_values.measurement_sequence_number().unwrap(),
-            mac: tag.mac,
+            time: tag.time,
+            temperature: values_normalized.temperature,
+            humidity: values_normalized.humidity,
+            pressure: values_normalized.pressure,
+            accelerationX: values_normalized.acceleration_x,
+            accelerationY: values_normalized.acceleration_y,
+            accelerationZ: values_normalized.acceleration_z,
+            batteryVoltage: values_normalized.battery_voltage,
+            movementCounter: values_normalized.movement_counter,
+            measurementSequenceNumber: values_normalized.measurement_sequence_number,
+            mac: tag.mac.to_string(),
         }
     }
 }
